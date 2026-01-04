@@ -1,0 +1,55 @@
+# Service endpoints for Ingress to route to cluster services
+# These services point to the backend services in each cluster
+# For same-cluster Ingress: Use ClusterIP services (default)
+# For cross-cluster Ingress: Use NodePort services or ExternalName
+
+# Option 1: Same Cluster - Direct service reference
+# If Ingress controller is in the same cluster, these can reference the services directly
+# by using the full service name: backend-service.cluster-hot.svc.cluster.local
+
+# Option 2: Cross-Cluster - NodePort access
+# If clusters are separate, create NodePort services and reference them via ExternalName
+# or use the NodePort directly in the Ingress backend
+
+---
+# Hot Cluster Service Endpoint
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-hot-service
+  namespace: default
+  labels:
+    app: backend-service
+    cluster: hot
+spec:
+  # For same-cluster: Use ClusterIP and reference cluster-hot namespace service
+  # For cross-cluster: Use ExternalName pointing to NodePort
+  type: ExternalName
+  externalName: backend-service.cluster-hot.svc.cluster.local
+  # Alternative for cross-cluster with NodePort:
+  # externalName: <minikube-ip-or-hostname>
+  # And use Endpoints resource instead
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+# Standby Cluster Service Endpoint  
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-standby-service
+  namespace: default
+  labels:
+    app: backend-service
+    cluster: standby
+spec:
+  type: ExternalName
+  externalName: backend-service.cluster-standby.svc.cluster.local
+  # Alternative for cross-cluster with NodePort:
+  # externalName: <minikube-ip-or-hostname>
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+

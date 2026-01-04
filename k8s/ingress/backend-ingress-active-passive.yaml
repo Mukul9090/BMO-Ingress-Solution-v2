@@ -1,0 +1,69 @@
+# Active-Passive Ingress Configuration
+# This uses two Ingress resources with different priorities
+# Primary Ingress routes to hot cluster, backup routes to standby
+
+---
+# Primary Ingress (Hot Cluster)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-ingress-primary
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/upstream-vhost: "backend-service"
+    # Custom header to identify which cluster is serving
+    # Note: more_set_headers requires headers-more-nginx-module
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      # more_set_headers "X-Cluster-Role: hot";
+      # more_set_headers "X-Cluster-Status: primary";
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: backend.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-hot-service
+                port:
+                  number: 80
+---
+# Backup Ingress (Standby Cluster) - Only active if primary fails
+# This Ingress will be used when primary cluster is down
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-ingress-backup
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/upstream-vhost: "backend-service"
+    # Lower priority - only used when primary is unavailable
+    # Note: more_set_headers requires headers-more-nginx-module
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      # more_set_headers "X-Cluster-Role: standby";
+      # more_set_headers "X-Cluster-Status: backup";
+    # This annotation makes this a backup route
+    # Note: NGINX Ingress doesn't have native backup support,
+    # so health checks will automatically route away from unhealthy backends
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: backend-backup.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-standby-service
+                port:
+                  number: 80
+

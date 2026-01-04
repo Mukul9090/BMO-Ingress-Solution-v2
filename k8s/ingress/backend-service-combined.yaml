@@ -1,0 +1,46 @@
+# Combined service that routes to both hot and standby clusters
+# This enables NGINX Ingress to automatically failover between clusters
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service-combined
+  namespace: default
+  labels:
+    app: backend-service
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  # This service will use Endpoints to route to both clusters
+  selector: {}  # Empty selector - we'll use Endpoints instead
+
+---
+# Endpoints that include both hot and standby cluster pods
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: backend-service-combined
+  namespace: default
+subsets:
+  # Hot cluster endpoints (primary)
+  - addresses:
+      - ip: 10.244.0.39  # Will be updated dynamically
+      - ip: 10.244.0.40
+      - ip: 10.244.0.41
+    ports:
+      - name: http
+        port: 8080
+        protocol: TCP
+  # Standby cluster endpoints (backup)
+  - addresses:
+      - ip: 10.244.0.42  # Will be updated dynamically
+      - ip: 10.244.0.43
+      - ip: 10.244.0.44
+    ports:
+      - name: http
+        port: 8080
+        protocol: TCP
+

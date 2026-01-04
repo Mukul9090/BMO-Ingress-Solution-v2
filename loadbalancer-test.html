@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Load Balancer & Failover Test Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stat-label {
+            color: #999;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .cluster-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .cluster-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .cluster-title {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .cluster-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: white;
+        }
+
+        .hot-icon {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .standby-icon {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .cluster-status {
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .status-online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-checking {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .response-box {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            min-height: 100px;
+        }
+
+        .response-box pre {
+            background: #2d3748;
+            color: #68d391;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .response-box.empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-style: italic;
+        }
+
+        .load-balancer-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .load-balancer-section h2 {
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .url-display {
+            background: rgba(255,255,255,0.2);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 1.1em;
+            word-break: break-all;
+        }
+
+        .test-results {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .result-item {
+            background: rgba(255,255,255,0.2);
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .result-role {
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .role-hot {
+            background: #f5576c;
+            color: white;
+        }
+
+        .role-standby {
+            background: #00f2fe;
+            color: #333;
+        }
+
+        .auto-test-controls {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .auto-test-controls h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #667eea;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .log-container {
+            background: #1a202c;
+            color: #68d391;
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            margin-top: 20px;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+        }
+
+        .log-entry.success {
+            color: #68d391;
+        }
+
+        .log-entry.error {
+            color: #fc8181;
+        }
+
+        .log-entry.info {
+            color: #90cdf4;
+        }
+
+        .architecture-diagram {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .diagram {
+            text-align: center;
+            font-family: monospace;
+            font-size: 0.9em;
+            line-height: 2;
+            color: #555;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .testing {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🔄 Load Balancer & Failover Test Dashboard</h1>
+            <p>Real-time monitoring and testing of two-cluster active-passive setup</p>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Requests</h3>
+                <div class="stat-value" id="total-requests">0</div>
+                <div class="stat-label">Requests sent</div>
+            </div>
+            <div class="stat-card">
+                <h3>Hot Cluster</h3>
+                <div class="stat-value" id="hot-requests">0</div>
+                <div class="stat-label">Responses received</div>
+            </div>
+            <div class="stat-card">
+                <h3>Standby Cluster</h3>
+                <div class="stat-value" id="standby-requests">0</div>
+                <div class="stat-label">Responses received</div>
+            </div>
+            <div class="stat-card">
+                <h3>Success Rate</h3>
+                <div class="stat-value" id="success-rate">100%</div>
+                <div class="stat-label">Successful requests</div>
+            </div>
+        </div>
+
+        <!-- Load Balancer Section -->
+        <div class="load-balancer-section">
+            <h2>🌐 Load Balancer (Single Entry Point)</h2>
+            <div class="url-display">http://localhost:8080</div>
+            
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="testLoadBalancer()">
+                    🔄 Test Load Balancer
+                </button>
+                <button class="btn btn-primary" onclick="testLoadBalancerMultiple()">
+                    🔄 Test Multiple Requests (10x)
+                </button>
+                <button class="btn btn-warning" onclick="startAutoTest()" id="auto-test-btn">
+                    ▶️ Start Auto Test
+                </button>
+            </div>
+
+            <div class="test-results" id="lb-results"></div>
+
+            <div class="response-box" id="lb-response">
+                <div class="empty">Click "Test Load Balancer" to see response</div>
+            </div>
+        </div>
+
+        <!-- Hot Cluster Section -->
+        <div class="cluster-section">
+            <div class="cluster-header">
+                <div class="cluster-title">
+                    <div class="cluster-icon hot-icon">🔥</div>
+                    <div>
+                        <h2>Hot Cluster (Primary)</h2>
+                        <p style="color: #999; font-size: 0.9em;">http://localhost:31080</p>
+                    </div>
+                </div>
+                <div class="cluster-status status-checking" id="hot-status">Not Tested</div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="testHot()">
+                    🔄 Test Hot Cluster
+                </button>
+                <button class="btn btn-danger" onclick="simulateHotFailure()">
+                    ⚠️ Simulate Failure
+                </button>
+                <button class="btn btn-success" onclick="restoreHot()">
+                    ✅ Restore Hot Cluster
+                </button>
+            </div>
+
+            <div class="response-box" id="hot-response">
+                <div class="empty">Click "Test Hot Cluster" to see response</div>
+            </div>
+        </div>
+
+        <!-- Standby Cluster Section -->
+        <div class="cluster-section">
+            <div class="cluster-header">
+                <div class="cluster-title">
+                    <div class="cluster-icon standby-icon">💤</div>
+                    <div>
+                        <h2>Standby Cluster (Backup)</h2>
+                        <p style="color: #999; font-size: 0.9em;">http://localhost:31081</p>
+                    </div>
+                </div>
+                <div class="cluster-status status-checking" id="standby-status">Not Tested</div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="testStandby()">
+                    🔄 Test Standby Cluster
+                </button>
+            </div>
+
+            <div class="response-box" id="standby-response">
+                <div class="empty">Click "Test Standby Cluster" to see response</div>
+            </div>
+        </div>
+
+        <!-- Auto Test Controls -->
+        <div class="auto-test-controls">
+            <h3>⚙️ Auto Test Configuration</h3>
+            <div class="toggle-switch">
+                <label class="switch">
+                    <input type="checkbox" id="auto-test-toggle" onchange="toggleAutoTest()">
+                    <span class="slider"></span>
+                </label>
+                <span>Continuous Testing (every 2 seconds)</span>
+            </div>
+            <div style="margin-top: 15px;">
+                <label>Test Interval: <input type="number" id="test-interval" value="2" min="1" max="10" style="width: 60px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;"> seconds</label>
+            </div>
+        </div>
+
+        <!-- Architecture Diagram -->
+        <div class="architecture-diagram">
+            <h3>📊 Architecture Overview</h3>
+            <div class="diagram">
+                Browser Request<br>
+                ↓<br>
+                <strong>NGINX Ingress Controller</strong><br>
+                (Load Balancer - Port 8080)<br>
+                ↓<br>
+                backend-service-combined<br>
+                ↓<br>
+                ┌──────────────┬──────────────┐<br>
+                │ 🔥 Hot       │ 💤 Standby   │<br>
+                │ (Primary)    │ (Backup)     │<br>
+                │ 3 pods       │ 3 pods       │<br>
+                └──────────────┴──────────────┘
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="cluster-section">
+            <h3>📋 Activity Log</h3>
+            <div class="log-container" id="activity-log">
+                <div class="log-entry info">System initialized. Ready for testing.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use backend.local hostname for proper ingress routing
+        // This requires /etc/hosts entry: 127.0.0.1 backend.local
+        // Or use minikube tunnel for proper DNS resolution
+        const LOAD_BALANCER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://backend.local:8080'  // Use hostname for proper ingress routing
+            : 'http://localhost:8080';     // Fallback
+        const HOT_URL = 'http://localhost:31080';
+        const STANDBY_URL = 'http://localhost:31081';
+
+        let stats = {
+            total: 0,
+            hot: 0,
+            standby: 0,
+            errors: 0
+        };
+
+        let autoTestInterval = null;
+
+        function updateStats() {
+            document.getElementById('total-requests').textContent = stats.total;
+            document.getElementById('hot-requests').textContent = stats.hot;
+            document.getElementById('standby-requests').textContent = stats.standby;
+            const successRate = stats.total > 0 
+                ? Math.round(((stats.total - stats.errors) / stats.total) * 100) 
+                : 100;
+            document.getElementById('success-rate').textContent = successRate + '%';
+        }
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('activity-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            log.insertBefore(entry, log.firstChild);
+            if (log.children.length > 50) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function updateStatus(cluster, status, text) {
+            const statusEl = document.getElementById(`${cluster}-status`);
+            statusEl.className = `cluster-status status-${status}`;
+            statusEl.textContent = text;
+        }
+
+        async function testLoadBalancer() {
+            const responseBox = document.getElementById('lb-response');
+            const resultsDiv = document.getElementById('lb-results');
+            responseBox.innerHTML = '<div class="empty testing">Testing load balancer...</div>';
+            resultsDiv.innerHTML = '';
+            
+            addLog('Testing load balancer...', 'info');
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                
+                // Note: Browsers don't allow setting Host header, so we use the URL directly
+                // The ingress should handle requests without Host header via the default rule
+                const response = await fetch(`${LOAD_BALANCER_URL}/healthz`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    credentials: 'omit',
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
+                }
+                
+                stats.total++;
+                if (data.role === 'hot') stats.hot++;
+                else if (data.role === 'standby') stats.standby++;
+                updateStats();
+                
+                const roleClass = data.role === 'hot' ? 'role-hot' : 'role-standby';
+                resultsDiv.innerHTML = `
+                    <div class="result-item">
+                        <span>Response from:</span>
+                        <span class="result-role ${roleClass}">${data.role.toUpperCase()}</span>
+                    </div>
+                `;
+                
+                responseBox.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                addLog(`Load balancer responded: ${data.role} cluster`, 'success');
+            } catch (error) {
+                stats.total++;
+                stats.errors++;
+                updateStats();
+                
+                let errorMsg = error.message || 'Unknown error occurred';
+                let troubleshooting = '';
+                
+                if (error.name === 'AbortError') {
+                    errorMsg = 'Request timed out';
+                    troubleshooting = 'Make sure port-forward is running: <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8080:80</code>';
+                } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('CORS')) {
+                    errorMsg = 'CORS/Network Error - Cannot connect to server';
+                    troubleshooting = `
+                        <strong>⚠️ CORS Issue Detected!</strong><br>
+                        If you opened this HTML file directly (file://), browsers block fetch requests due to CORS.<br><br>
+                        <strong>Solution:</strong> Serve the HTML file via HTTP server:<br>
+                        <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">cd "$(dirname "$0")" && python3 -m http.server 8000</code><br>
+                        Then open: <a href="http://localhost:8000/loadbalancer-test.html" target="_blank">http://localhost:8000/loadbalancer-test.html</a><br><br>
+                        Or check if port-forward is running:<br>
+                        <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8080:80</code>
+                    `;
+                } else {
+                    troubleshooting = `
+                        1. Check if port-forward is running:<br>
+                        <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8080:80</code><br><br>
+                        2. Try opening directly: <a href="${LOAD_BALANCER_URL}/healthz" target="_blank">${LOAD_BALANCER_URL}/healthz</a>
+                    `;
+                }
+                
+                responseBox.innerHTML = `<div style="color: #dc3545; padding: 15px; background: #ffe6e6; border-radius: 5px;">
+                    <strong>❌ Error:</strong> ${errorMsg}<br><br>
+                    <strong>💡 Troubleshooting:</strong><br>
+                    ${troubleshooting}
+                </div>`;
+                addLog(`Load balancer error: ${errorMsg}`, 'error');
+            }
+        }
+
+        async function testLoadBalancerMultiple() {
+            const resultsDiv = document.getElementById('lb-results');
+            const responseBox = document.getElementById('lb-response');
+            resultsDiv.innerHTML = '<div class="result-item">Testing 10 requests...</div>';
+            responseBox.innerHTML = '<div class="empty testing">Running multiple tests...</div>';
+            
+            addLog('Starting multiple load balancer tests (10 requests)...', 'info');
+            
+            const results = [];
+            for (let i = 1; i <= 10; i++) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
+                    
+                    const response = await fetch(`${LOAD_BALANCER_URL}/healthz`, {
+                        method: 'GET',
+                        mode: 'cors',
+                        cache: 'no-cache',
+                        signal: controller.signal,
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const text = await response.text();
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        throw new Error('Invalid JSON response');
+                    }
+                    
+                    results.push({ request: i, role: data.role, data: data });
+                    stats.total++;
+                    if (data.role === 'hot') stats.hot++;
+                    else if (data.role === 'standby') stats.standby++;
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                } catch (error) {
+                    results.push({ request: i, error: error.name === 'AbortError' ? 'Timeout' : error.message });
+                    stats.total++;
+                    stats.errors++;
+                }
+                updateStats();
+            }
+            
+            const hotCount = results.filter(r => r.role === 'hot').length;
+            const standbyCount = results.filter(r => r.role === 'standby').length;
+            
+            resultsDiv.innerHTML = results.map(r => {
+                if (r.error) {
+                    return `<div class="result-item"><span>Request ${r.request}</span><span style="color: #dc3545;">Error</span></div>`;
+                }
+                const roleClass = r.role === 'hot' ? 'role-hot' : 'role-standby';
+                return `<div class="result-item"><span>Request ${r.request}</span><span class="result-role ${roleClass}">${r.role.toUpperCase()}</span></div>`;
+            }).join('');
+            
+            resultsDiv.innerHTML += `
+                <div class="result-item" style="margin-top: 15px; padding: 15px; background: rgba(255,255,255,0.3); border-radius: 8px;">
+                    <strong>Summary:</strong> Hot: ${hotCount} | Standby: ${standbyCount} | Total: 10
+                </div>
+            `;
+            
+            responseBox.innerHTML = `<pre>${JSON.stringify(results, null, 2)}</pre>`;
+            addLog(`Multiple test complete: ${hotCount} hot, ${standbyCount} standby`, 'success');
+        }
+
+        async function testHot() {
+            const responseBox = document.getElementById('hot-response');
+            updateStatus('hot', 'checking', 'Testing...');
+            responseBox.innerHTML = '<div class="empty testing">Testing hot cluster...</div>';
+            
+            addLog('Testing hot cluster...', 'info');
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(`${HOT_URL}/healthz`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
+                }
+                
+                updateStatus('hot', 'online', '✅ Online');
+                responseBox.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                addLog('Hot cluster is responding', 'success');
+            } catch (error) {
+                updateStatus('hot', 'offline', '❌ Offline');
+                const errorMsg = error.name === 'AbortError' 
+                    ? 'Request timed out'
+                    : error.message || 'Unknown error occurred';
+                
+                let troubleshooting = '';
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('CORS')) {
+                    troubleshooting = `
+                        <br><br><strong>💡 Troubleshooting:</strong><br>
+                        1. <strong>Check if port-forward is running:</strong><br>
+                        <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">ps aux | grep "kubectl port-forward.*31080"</code><br><br>
+                        2. <strong>If not running, start it:</strong><br>
+                        <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">kubectl port-forward -n cluster-hot svc/backend-service-nodeport 31080:80 &</code><br><br>
+                        3. <strong>Test directly:</strong><br>
+                        <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">curl http://localhost:31080/healthz</code><br><br>
+                        4. <strong>CORS Issue?</strong> If opened via file://, serve via HTTP:<br>
+                        <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">python3 -m http.server 8000</code>
+                    `;
+                } else {
+                    troubleshooting = `
+                        <br><br><strong>💡 Troubleshooting:</strong><br>
+                        - Check if port-forward is running: <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">ps aux | grep "kubectl port-forward.*31080"</code><br>
+                        - Restart port-forward: <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">kubectl port-forward -n cluster-hot svc/backend-service-nodeport 31080:80 &</code><br>
+                        - Check pods: <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">kubectl get pods -n cluster-hot</code>
+                    `;
+                }
+                
+                responseBox.innerHTML = `<div style="color: #dc3545; padding: 15px; background: #ffe6e6; border-radius: 5px;">
+                    <strong>❌ Error:</strong> ${errorMsg}${troubleshooting}
+                </div>`;
+                addLog(`Hot cluster error: ${errorMsg}`, 'error');
+            }
+        }
+
+        async function testStandby() {
+            const responseBox = document.getElementById('standby-response');
+            updateStatus('standby', 'checking', 'Testing...');
+            responseBox.innerHTML = '<div class="empty testing">Testing standby cluster...</div>';
+            
+            addLog('Testing standby cluster...', 'info');
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(`${STANDBY_URL}/healthz`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
+                }
+                
+                updateStatus('standby', 'online', '✅ Online');
+                responseBox.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                addLog('Standby cluster is responding', 'success');
+            } catch (error) {
+                updateStatus('standby', 'offline', '❌ Offline');
+                const errorMsg = error.name === 'AbortError' 
+                    ? 'Request timed out'
+                    : error.message || 'Unknown error occurred';
+                responseBox.innerHTML = `<div style="color: #dc3545;">❌ Error: ${errorMsg}</div>`;
+                addLog(`Standby cluster error: ${errorMsg}`, 'error');
+            }
+        }
+
+        function simulateHotFailure() {
+            const cmd = 'kubectl scale deployment backend-service -n cluster-hot --replicas=0';
+            const updateCmd = './scripts/update-endpoints.sh';
+            alert(`To simulate hot cluster failure, run these commands in terminal:\n\n${cmd}\n\nThen run:\n${updateCmd}\n\nAfter that, test the load balancer again - it should route to standby!`);
+            addLog('Hot cluster failure simulation requested', 'info');
+        }
+
+        function restoreHot() {
+            const cmd = 'kubectl scale deployment backend-service -n cluster-hot --replicas=3';
+            const updateCmd = './scripts/update-endpoints.sh';
+            alert(`To restore hot cluster, run these commands in terminal:\n\n${cmd}\n\nThen run:\n${updateCmd}\n\nAfter that, test again - both clusters should be available!`);
+            addLog('Hot cluster restore requested', 'info');
+        }
+
+        function startAutoTest() {
+            if (autoTestInterval) {
+                clearInterval(autoTestInterval);
+                autoTestInterval = null;
+                document.getElementById('auto-test-btn').textContent = '▶️ Start Auto Test';
+                addLog('Auto test stopped', 'info');
+            } else {
+                const interval = parseInt(document.getElementById('test-interval').value) * 1000;
+                autoTestInterval = setInterval(testLoadBalancer, interval);
+                document.getElementById('auto-test-btn').textContent = '⏸️ Stop Auto Test';
+                addLog(`Auto test started (every ${interval/1000}s)`, 'info');
+            }
+        }
+
+        function toggleAutoTest() {
+            const toggle = document.getElementById('auto-test-toggle');
+            if (toggle.checked) {
+                startAutoTest();
+            } else {
+                if (autoTestInterval) {
+                    clearInterval(autoTestInterval);
+                    autoTestInterval = null;
+                    document.getElementById('auto-test-btn').textContent = '▶️ Start Auto Test';
+                }
+            }
+        }
+
+        // Initialize
+        window.onload = function() {
+            // Check if page is opened via file:// protocol (CORS issues)
+            if (window.location.protocol === 'file:') {
+                addLog('⚠️ WARNING: Page opened via file:// - CORS will block fetch requests!', 'error');
+                addLog('💡 Solution: Run "python3 -m http.server 8000" and open http://localhost:8000/loadbalancer-test.html', 'info');
+                document.getElementById('lb-response').innerHTML = `
+                    <div style="color: #856404; padding: 15px; background: #fff3cd; border-radius: 5px; border: 1px solid #ffc107;">
+                        <strong>⚠️ CORS Warning:</strong><br>
+                        This page was opened via file:// protocol. Browsers block fetch requests in this mode.<br><br>
+                        <strong>Solution:</strong> Serve this file via HTTP server:<br>
+                        <code style="background: #f0f0f0; padding: 5px; border-radius: 3px; display: block; margin: 10px 0;">
+                            cd "$(dirname "$0")" && python3 -m http.server 8000
+                        </code>
+                        Then open: <a href="http://localhost:8000/loadbalancer-test.html" target="_blank" style="color: #007bff;">http://localhost:8000/loadbalancer-test.html</a>
+                    </div>
+                `;
+            } else {
+                addLog('Dashboard loaded. Click "Test" buttons to check connectivity...', 'info');
+                // Auto-test on load with a small delay to ensure port-forwards are ready
+                setTimeout(() => {
+                    addLog('Running initial connectivity tests...', 'info');
+                    testHot();
+                    testStandby();
+                    testLoadBalancer();
+                }, 1000);
+            }
+        };
+    </script>
+</body>
+</html>
+

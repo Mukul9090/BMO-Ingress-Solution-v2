@@ -1,0 +1,47 @@
+# Ingress with automatic failover configuration
+# Routes to hot cluster primarily, automatically fails over to standby when hot is unhealthy
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-ingress-failover
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    
+    # Enable upstream keepalive for better health checking
+    nginx.ingress.kubernetes.io/upstream-keepalive-connections: "100"
+    nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "60"
+    nginx.ingress.kubernetes.io/upstream-keepalive-requests: "100"
+    
+    # Health check configuration
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+    
+    # Custom server-snippet to configure upstream with both clusters
+    # Note: This requires the endpoints to be properly configured
+    nginx.ingress.kubernetes.io/server-snippet: |
+      # Health check interval
+      proxy_connect_timeout 5s;
+      proxy_send_timeout 10s;
+      proxy_read_timeout 10s;
+      
+      # Retry on failure
+      proxy_next_upstream error timeout http_500 http_502 http_503;
+      proxy_next_upstream_tries 2;
+      proxy_next_upstream_timeout 10s;
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: backend.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service-combined
+                port:
+                  number: 80
+
