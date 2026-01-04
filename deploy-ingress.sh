@@ -19,6 +19,16 @@ echo "Method: $INGRESS_METHOD"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# In CI/CD mode, disable validation if cluster is not directly accessible
+VALIDATE_FLAG=""
+if [ "$CI_CD_MODE" = "true" ]; then
+    # Test if we can reach the cluster for validation
+    if ! kubectl cluster-info --request-timeout=5s &>/dev/null; then
+        VALIDATE_FLAG="--validate=false"
+        echo "ℹ️  Cluster not directly accessible, disabling manifest validation"
+    fi
+fi
+
 case "$INGRESS_METHOD" in
     minikube)
         echo ""
@@ -76,7 +86,7 @@ case "$INGRESS_METHOD" in
         echo "=== Step 1: Installing via Official Manifests ==="
         echo "Downloading and applying NGINX Ingress Controller manifests..."
         
-        kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+        kubectl apply $VALIDATE_FLAG -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
         
         echo "✓ Ingress installed via manifests"
         
@@ -100,7 +110,7 @@ esac
 echo ""
 echo "=== Step 2: Applying NGINX Configuration ==="
 if [ -f "k8s/ingress/nginx-configmap.yaml" ]; then
-    kubectl apply -f k8s/ingress/nginx-configmap.yaml
+    kubectl apply $VALIDATE_FLAG -f k8s/ingress/nginx-configmap.yaml
     echo "✓ NGINX ConfigMap applied"
 else
     echo "⚠ NGINX ConfigMap not found, skipping"
@@ -109,7 +119,7 @@ fi
 echo ""
 echo "=== Step 3: Creating External Services ==="
 if [ -f "k8s/ingress/external-services.yaml" ]; then
-    kubectl apply -f k8s/ingress/external-services.yaml
+    kubectl apply $VALIDATE_FLAG -f k8s/ingress/external-services.yaml
     echo "✓ External services created"
 else
     echo "⚠ External services manifest not found, skipping"
@@ -119,22 +129,22 @@ echo ""
 echo "=== Step 4: Applying Ingress Resources ==="
 # Apply combined service and endpoints first
 if [ -f "k8s/ingress/backend-service-combined.yaml" ]; then
-    kubectl apply -f k8s/ingress/backend-service-combined.yaml
+    kubectl apply $VALIDATE_FLAG -f k8s/ingress/backend-service-combined.yaml
     echo "✓ Combined service and endpoints applied"
 fi
 
 # Apply the simple ingress (primary)
 if [ -f "k8s/ingress/backend-ingress-simple.yaml" ]; then
-    kubectl apply -f k8s/ingress/backend-ingress-simple.yaml
+    kubectl apply $VALIDATE_FLAG -f k8s/ingress/backend-ingress-simple.yaml
     echo "✓ Primary Ingress resource applied"
 elif [ -f "k8s/ingress/backend-ingress.yaml" ]; then
-    kubectl apply -f k8s/ingress/backend-ingress.yaml
+    kubectl apply $VALIDATE_FLAG -f k8s/ingress/backend-ingress.yaml
     echo "✓ Primary Ingress resource applied"
 fi
 
 # Apply active-passive ingress (optional)
 if [ -f "k8s/ingress/backend-ingress-active-passive.yaml" ]; then
-    kubectl apply -f k8s/ingress/backend-ingress-active-passive.yaml
+    kubectl apply $VALIDATE_FLAG -f k8s/ingress/backend-ingress-active-passive.yaml
     echo "✓ Active-Passive Ingress resources applied"
 fi
 

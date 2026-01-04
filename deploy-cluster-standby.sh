@@ -56,26 +56,37 @@ fi
 
 echo ""
 echo "=== Step 3: Applying Kubernetes Manifests ==="
+
+# In CI/CD mode, disable validation if cluster is not directly accessible
+VALIDATE_FLAG=""
+if [ "$CI_CD_MODE" = "true" ]; then
+    # Test if we can reach the cluster for validation
+    if ! kubectl cluster-info --request-timeout=5s &>/dev/null; then
+        VALIDATE_FLAG="--validate=false"
+        echo "ℹ️  Cluster not directly accessible, disabling manifest validation"
+    fi
+fi
+
 echo "Creating namespace..."
-kubectl apply -f k8s/cluster-standby/namespace.yaml
+kubectl apply $VALIDATE_FLAG -f k8s/cluster-standby/namespace.yaml
 echo "✓ Namespace created"
 
 echo "Creating ConfigMap..."
-kubectl apply -f k8s/cluster-standby/configmap.yaml
+kubectl apply $VALIDATE_FLAG -f k8s/cluster-standby/configmap.yaml
 echo "✓ ConfigMap created"
 
 echo "Creating Deployment..."
-kubectl apply -f k8s/cluster-standby/deployment.yaml
+kubectl apply $VALIDATE_FLAG -f k8s/cluster-standby/deployment.yaml
 echo "✓ Deployment created"
 
 echo "Creating Service (ClusterIP)..."
-kubectl apply -f k8s/cluster-standby/service.yaml
+kubectl apply $VALIDATE_FLAG -f k8s/cluster-standby/service.yaml
 echo "✓ Service created"
 
 # Optionally create NodePort service for cross-cluster access
 if [ "${CREATE_NODEPORT:-false}" = "true" ]; then
     echo "Creating NodePort Service..."
-    kubectl apply -f k8s/cluster-standby/service-nodeport.yaml
+    kubectl apply $VALIDATE_FLAG -f k8s/cluster-standby/service-nodeport.yaml
     echo "✓ NodePort Service created"
 fi
 

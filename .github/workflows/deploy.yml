@@ -109,8 +109,44 @@ jobs:
           IMAGE_TAG: ghcr.io/${{ steps.repo.outputs.repo_lower }}/backend-service:${{ github.sha }}
           CI_CD_MODE: "true"
         run: |
+          echo "=== Setting up Hot Cluster Kubeconfig ==="
           mkdir -p ~/.kube
+          
+          # Decode and write kubeconfig
           echo "$KUBECONFIG_HOT" | base64 -d > ~/.kube/config-hot
+          
+          # Verify kubeconfig file was created and is valid
+          if [ ! -f ~/.kube/config-hot ]; then
+            echo "❌ Error: Kubeconfig file not created"
+            exit 1
+          fi
+          
+          # Set KUBECONFIG environment variable
+          export KUBECONFIG=~/.kube/config-hot
+          
+          # Verify kubectl can read the config
+          echo "Verifying kubeconfig..."
+          kubectl config view --minify || {
+            echo "❌ Error: Invalid kubeconfig"
+            exit 1
+          }
+          
+          # Show current context and cluster info (without sensitive data)
+          echo "Current context: $(kubectl config current-context 2>/dev/null || echo 'none')"
+          echo "Cluster server: $(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo 'unknown')"
+          
+          # Test cluster connection (non-blocking)
+          echo "Testing cluster connection..."
+          kubectl cluster-info --request-timeout=10s 2>&1 || {
+            echo "⚠️  Warning: Could not reach cluster directly from GitHub Actions"
+            echo "This is normal if your cluster is behind a firewall or requires VPN"
+            echo "Will attempt deployment with validation disabled if needed"
+          }
+          
+          echo "✓ Kubeconfig ready"
+          echo ""
+          
+          # Export KUBECONFIG for the script
           export KUBECONFIG=~/.kube/config-hot
           bash deploy-cluster-hot.sh
 
@@ -120,9 +156,39 @@ jobs:
           IMAGE_TAG: ghcr.io/${{ steps.repo.outputs.repo_lower }}/backend-service:${{ github.sha }}
           CI_CD_MODE: "true"
         run: |
+          echo "=== Setting up Standby Cluster Kubeconfig ==="
           mkdir -p ~/.kube
+          
+          # Decode and write kubeconfig
           echo "$KUBECONFIG_STANDBY" | base64 -d > ~/.kube/config-standby
+          
+          # Verify kubeconfig file was created and is valid
+          if [ ! -f ~/.kube/config-standby ]; then
+            echo "❌ Error: Kubeconfig file not created"
+            exit 1
+          fi
+          
+          # Set KUBECONFIG environment variable
           export KUBECONFIG=~/.kube/config-standby
+          
+          # Verify kubectl can read the config
+          echo "Verifying kubeconfig..."
+          kubectl config view --minify || {
+            echo "❌ Error: Invalid kubeconfig"
+            exit 1
+          }
+          
+          # Test cluster connection
+          echo "Testing cluster connection..."
+          kubectl cluster-info || {
+            echo "⚠️  Warning: Could not reach cluster, but continuing..."
+          }
+          
+          # Show current context
+          echo "Current context: $(kubectl config current-context 2>/dev/null || echo 'none')"
+          
+          echo "✓ Kubeconfig ready"
+          echo ""
           bash deploy-cluster-standby.sh
 
       - name: 🌐 Deploy Ingress
@@ -131,9 +197,39 @@ jobs:
           INGRESS_METHOD: "manifest"
           CI_CD_MODE: "true"
         run: |
+          echo "=== Setting up Ingress Kubeconfig ==="
           mkdir -p ~/.kube
+          
+          # Decode and write kubeconfig
           echo "$KUBECONFIG_HOT" | base64 -d > ~/.kube/config-hot
+          
+          # Verify kubeconfig file was created and is valid
+          if [ ! -f ~/.kube/config-hot ]; then
+            echo "❌ Error: Kubeconfig file not created"
+            exit 1
+          fi
+          
+          # Set KUBECONFIG environment variable
           export KUBECONFIG=~/.kube/config-hot
+          
+          # Verify kubectl can read the config
+          echo "Verifying kubeconfig..."
+          kubectl config view --minify || {
+            echo "❌ Error: Invalid kubeconfig"
+            exit 1
+          }
+          
+          # Test cluster connection
+          echo "Testing cluster connection..."
+          kubectl cluster-info || {
+            echo "⚠️  Warning: Could not reach cluster, but continuing..."
+          }
+          
+          # Show current context
+          echo "Current context: $(kubectl config current-context 2>/dev/null || echo 'none')"
+          
+          echo "✓ Kubeconfig ready"
+          echo ""
           bash deploy-ingress.sh
 
       - name: ✅ Deployment Summary
