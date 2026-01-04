@@ -9,6 +9,9 @@ jobs:
   deploy:
     name: Build and Deploy All Clusters
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     
     steps:
       - name: 🔧 Set lowercase repository name
