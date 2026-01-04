@@ -20,15 +20,67 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: ☸️ Install kubectl
+      - name: 📦 Install all dependencies
         run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          echo "=== Installing Required Dependencies ==="
+          
+          # Update package list
+          sudo apt-get update -qq
+          
+          # Install essential build tools and utilities
+          sudo apt-get install -y -qq \
+            curl \
+            wget \
+            ca-certificates \
+            gnupg \
+            lsb-release \
+            jq \
+            git \
+            bash \
+            sed \
+            grep \
+            coreutils
+          
+          # Verify basic tools
+          echo "✓ Basic tools installed"
+          bash --version | head -1
+          curl --version | head -1
+          sed --version | head -1
+          
+          # Install kubectl
+          echo ""
+          echo "=== Installing kubectl ==="
+          KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+          curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/
           kubectl version --client
+          echo "✓ kubectl installed"
+          
+          # Verify all required commands are available
+          echo ""
+          echo "=== Verifying Dependencies ==="
+          command -v bash && echo "✓ bash: $(bash --version | head -1)"
+          command -v curl && echo "✓ curl: $(curl --version | head -1)"
+          command -v sed && echo "✓ sed: $(sed --version | head -1)"
+          command -v base64 && echo "✓ base64: available"
+          command -v kubectl && echo "✓ kubectl: $(kubectl version --client --short 2>/dev/null || echo 'installed')"
+          command -v jq && echo "✓ jq: $(jq --version)"
+          command -v git && echo "✓ git: $(git --version)"
+          
+          echo ""
+          echo "✅ All dependencies installed and verified!"
 
       - name: 🐳 Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: ✅ Verify Docker and Buildx
+        run: |
+          echo "=== Verifying Docker Setup ==="
+          docker --version
+          docker buildx version
+          docker buildx ls
+          echo "✓ Docker and Buildx ready"
 
       - name: 🔐 Login to GitHub Container Registry
         uses: docker/login-action@v3
